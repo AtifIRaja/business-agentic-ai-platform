@@ -1,0 +1,851 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Al-Buraq API",
+    "description": "Ethical AI Dispatch System API\n\nExposes Al-Buraq's core functionality for external integrations:\n- Hunt for new carrier leads\n- Verify leads with social media intelligence\n- Match loads to verified carriers (halal-compliant)\n- Query verified leads database\n\nBuilt with integrity, dispatched with honesty.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Health Check",
+        "description": "Health check endpoint for monitoring and load balancers.\n\nReturns system status, version, and database connectivity.",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Root",
+        "description": "Root endpoint with API information",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent/hunt": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Hunt Leads",
+        "description": "Trigger the Hunter Agent to find new carrier leads.\n\nThe Hunter Agent:\n- Searches configured sources (FMCSA SAFER, load boards)\n- Scores and qualifies leads based on criteria\n- Optionally saves results to database\n\nExample:\n    ```json\n    {\n      \"limit\": 50,\n      \"source\": \"fmcsa\",\n      \"min_score\": 0.7,\n      \"save\": true\n    }\n    ```",
+        "operationId": "hunt_leads_v1_agent_hunt_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HuntRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HuntResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent/verify": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Verify Leads",
+        "description": "Trigger the Investigator Agent to verify leads.\n\nThe Investigator Agent:\n- Searches for social media presence (LinkedIn, Facebook, etc.)\n- Identifies high-intent signals for outreach\n- Updates verification status in database\n\nExample:\n    ```json\n    {\n      \"limit\": 10,\n      \"delay_seconds\": 3.0\n    }\n    ```",
+        "operationId": "verify_leads_v1_agent_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent/dispatch": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Dispatch Loads",
+        "description": "Trigger the Dispatch Agent to match loads with carriers.\n\nThe Dispatch Agent:\n- Filters loads through halal compliance checker\n- Matches loads to verified carriers using AI scoring\n- Calculates commission (7%) and charity contribution (5%)\n- Returns ranked carrier recommendations\n\nExample:\n    ```json\n    {\n      \"load_count\": 5,\n      \"matches_per_load\": 3,\n      \"mock_mode\": true\n    }\n    ```",
+        "operationId": "dispatch_loads_v1_agent_dispatch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DispatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/leads/verified": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Get Verified Leads",
+        "description": "Get list of verified leads ready for outreach.\n\nReturns leads that have been investigated and verified,\nwith optional filters for social media presence and intent signals.\n\nQuery Parameters:\n- limit: Maximum number of leads to return (1-500)\n- social_verified: Filter by social media verification (true/false)\n- high_intent: Filter by high-intent signals (true/false)\n\nExample:\n    GET /v1/leads/verified?limit=50&social_verified=true",
+        "operationId": "get_verified_leads_v1_leads_verified_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Max leads to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Max leads to return"
+          },
+          {
+            "name": "social_verified",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by social verification",
+              "title": "Social Verified"
+            },
+            "description": "Filter by social verification"
+          },
+          {
+            "name": "high_intent",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by high intent",
+              "title": "High Intent"
+            },
+            "description": "Filter by high intent"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifiedLeadsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/stats": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Get Stats",
+        "description": "Get system statistics and metrics.\n\nReturns:\n- Lead pipeline counts (new, qualified, verified, converted)\n- Carrier counts (active, available)\n- Load counts (available, booked, delivered)\n- Verification statistics",
+        "operationId": "get_stats_v1_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DispatchLoadRecommendation": {
+        "properties": {
+          "load_origin": {
+            "type": "string",
+            "title": "Load Origin"
+          },
+          "load_destination": {
+            "type": "string",
+            "title": "Load Destination"
+          },
+          "commodity": {
+            "type": "string",
+            "title": "Commodity"
+          },
+          "rate": {
+            "type": "number",
+            "title": "Rate"
+          },
+          "halal_status": {
+            "type": "string",
+            "title": "Halal Status"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/DispatchMatch"
+            },
+            "type": "array",
+            "title": "Matches"
+          }
+        },
+        "type": "object",
+        "required": [
+          "load_origin",
+          "load_destination",
+          "commodity",
+          "rate",
+          "halal_status",
+          "matches"
+        ],
+        "title": "DispatchLoadRecommendation",
+        "description": "Load with carrier matches"
+      },
+      "DispatchMatch": {
+        "properties": {
+          "carrier_name": {
+            "type": "string",
+            "title": "Carrier Name"
+          },
+          "carrier_mc": {
+            "type": "string",
+            "title": "Carrier Mc"
+          },
+          "carrier_state": {
+            "type": "string",
+            "title": "Carrier State"
+          },
+          "match_score": {
+            "type": "number",
+            "title": "Match Score"
+          },
+          "estimated_commission": {
+            "type": "number",
+            "title": "Estimated Commission"
+          },
+          "charity_contribution": {
+            "type": "number",
+            "title": "Charity Contribution"
+          },
+          "match_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Match Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "carrier_name",
+          "carrier_mc",
+          "carrier_state",
+          "match_score",
+          "estimated_commission",
+          "charity_contribution",
+          "match_reasons"
+        ],
+        "title": "DispatchMatch",
+        "description": "Single carrier match for a load"
+      },
+      "DispatchRequest": {
+        "properties": {
+          "load_count": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Load Count",
+            "description": "Number of loads to match",
+            "default": 5
+          },
+          "matches_per_load": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Matches Per Load",
+            "description": "Matches per load",
+            "default": 3
+          },
+          "mock_mode": {
+            "type": "boolean",
+            "title": "Mock Mode",
+            "description": "Use sample/mock loads instead of real loads",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "DispatchRequest",
+        "description": "Request to trigger Dispatch matching"
+      },
+      "DispatchResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "total_loads": {
+            "type": "integer",
+            "title": "Total Loads"
+          },
+          "halal_loads": {
+            "type": "integer",
+            "title": "Halal Loads"
+          },
+          "haram_loads": {
+            "type": "integer",
+            "title": "Haram Loads"
+          },
+          "total_matches": {
+            "type": "integer",
+            "title": "Total Matches"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "title": "Duration Seconds"
+          },
+          "recommendations": {
+            "items": {
+              "$ref": "#/components/schemas/DispatchLoadRecommendation"
+            },
+            "type": "array",
+            "title": "Recommendations"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "total_loads",
+          "halal_loads",
+          "haram_loads",
+          "total_matches",
+          "duration_seconds",
+          "recommendations",
+          "message"
+        ],
+        "title": "DispatchResponse",
+        "description": "Response from Dispatch operation"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "database_connected": {
+            "type": "boolean",
+            "title": "Database Connected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version",
+          "timestamp",
+          "database_connected"
+        ],
+        "title": "HealthResponse",
+        "description": "Health check response"
+      },
+      "HuntRequest": {
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "description": "Max leads to find",
+            "default": 20
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Specific source (e.g., 'fmcsa')"
+          },
+          "min_score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Min Score",
+            "description": "Minimum lead score",
+            "default": 0.6
+          },
+          "save": {
+            "type": "boolean",
+            "title": "Save",
+            "description": "Save results to database",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "HuntRequest",
+        "description": "Request to trigger the Hunter Agent"
+      },
+      "HuntResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "title": "Duration Seconds"
+          },
+          "total_found": {
+            "type": "integer",
+            "title": "Total Found"
+          },
+          "total_qualified": {
+            "type": "integer",
+            "title": "Total Qualified"
+          },
+          "qualification_rate": {
+            "type": "number",
+            "title": "Qualification Rate"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "duration_seconds",
+          "total_found",
+          "total_qualified",
+          "qualification_rate",
+          "message"
+        ],
+        "title": "HuntResponse",
+        "description": "Response from Hunt operation"
+      },
+      "LeadContact": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "type": "object",
+        "title": "LeadContact",
+        "description": "Contact information"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VerifiedLead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "company_name": {
+            "type": "string",
+            "title": "Company Name"
+          },
+          "mc_number": {
+            "type": "string",
+            "title": "Mc Number"
+          },
+          "owner_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Name"
+          },
+          "contact": {
+            "$ref": "#/components/schemas/LeadContact"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "truck_count": {
+            "type": "integer",
+            "title": "Truck Count"
+          },
+          "equipment_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Equipment Types"
+          },
+          "lead_score": {
+            "type": "number",
+            "title": "Lead Score"
+          },
+          "social_verified": {
+            "type": "boolean",
+            "title": "Social Verified"
+          },
+          "high_intent": {
+            "type": "boolean",
+            "title": "High Intent"
+          },
+          "linkedin_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedin Url"
+          },
+          "facebook_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facebook Url"
+          },
+          "website_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website Url"
+          },
+          "verification_status": {
+            "type": "string",
+            "title": "Verification Status"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "company_name",
+          "mc_number",
+          "contact",
+          "truck_count",
+          "equipment_types",
+          "lead_score",
+          "social_verified",
+          "high_intent",
+          "verification_status"
+        ],
+        "title": "VerifiedLead",
+        "description": "Verified lead summary"
+      },
+      "VerifiedLeadsResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "leads": {
+            "items": {
+              "$ref": "#/components/schemas/VerifiedLead"
+            },
+            "type": "array",
+            "title": "Leads"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "leads"
+        ],
+        "title": "VerifiedLeadsResponse",
+        "description": "List of verified leads"
+      },
+      "VerifyRequest": {
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "description": "Max leads to investigate",
+            "default": 5
+          },
+          "delay_seconds": {
+            "type": "number",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Delay Seconds",
+            "description": "Delay between searches",
+            "default": 2.0
+          }
+        },
+        "type": "object",
+        "title": "VerifyRequest",
+        "description": "Request to trigger the Investigator Agent"
+      },
+      "VerifyResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "total_investigated": {
+            "type": "integer",
+            "title": "Total Investigated"
+          },
+          "social_verified_count": {
+            "type": "integer",
+            "title": "Social Verified Count"
+          },
+          "high_intent_count": {
+            "type": "integer",
+            "title": "High Intent Count"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "title": "Duration Seconds"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "total_investigated",
+          "social_verified_count",
+          "high_intent_count",
+          "duration_seconds",
+          "message"
+        ],
+        "title": "VerifyResponse",
+        "description": "Response from Verify operation"
+      }
+    }
+  }
+}

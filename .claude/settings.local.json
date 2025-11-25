@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m al_buraq.cli.main hunt:*)",
+      "Bash(python -m al_buraq.cli.main investigate:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

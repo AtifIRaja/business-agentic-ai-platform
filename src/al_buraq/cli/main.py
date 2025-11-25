@@ -327,6 +327,294 @@ def version():
     ))
 
 
+@app.command()
+def share(
+    port: int = typer.Option(8000, "--port", "-p", help="Local port to share (where API is running)"),
+    region: str = typer.Option("us", "--region", help="ngrok region (us, eu, ap, au, sa, jp, in)"),
+    authtoken: Optional[str] = typer.Option(None, "--authtoken", "-t", help="ngrok authtoken (if not configured)"),
+):
+    """
+    Share your local API with the internet via ngrok tunnel.
+
+    Creates a secure public URL that tunnels to your local API server.
+    Perfect for:
+    - Connecting OpenAI Agent Builder to your local API
+    - Sharing your API with team members
+    - Quick demos without deploying to cloud
+    - Testing webhooks and external integrations
+
+    REQUIREMENTS:
+    1. Start your API server first: alburaq serve
+    2. Sign up at https://ngrok.com (free tier available)
+    3. Configure authtoken: ngrok config add-authtoken YOUR_TOKEN
+
+    Examples:
+        alburaq share
+        alburaq share --port 8000
+        alburaq share --authtoken YOUR_TOKEN
+        alburaq share --region eu
+
+    The tunnel will display:
+    - Public URL (e.g., https://abc123.ngrok-free.app)
+    - OpenAPI Schema URL for Agent Builder
+    - All available endpoints
+    """
+    from ..tunnel import start_tunnel
+
+    console.print(Panel.fit(
+        "[bold green]Al-Buraq Internet Tunnel[/bold green]\n\n"
+        f"Creating public tunnel for port {port}...\n\n"
+        "[dim]Make sure your API server is running first:[/dim]\n"
+        "[cyan]alburaq serve[/cyan]",
+        title="Bismillah - Sharing Mode",
+    ))
+
+    try:
+        # Start tunnel
+        manager = start_tunnel(
+            port=port,
+            region=region,
+            authtoken=authtoken,
+            display=True,
+        )
+
+        # Monitor and keep alive
+        manager.monitor()
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Tunnel stopped by user[/yellow]")
+    except Exception as e:
+        console.print(f"\n[red]Tunnel failed: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def serve(
+    host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host to bind to"),
+    port: int = typer.Option(8000, "--port", "-p", help="Port to bind to"),
+    reload: bool = typer.Option(False, "--reload", "-r", help="Enable auto-reload on code changes"),
+):
+    """
+    Start the Al-Buraq API server.
+
+    Launches a FastAPI server exposing Al-Buraq's functionality as REST API endpoints
+    for external integrations, OpenAI Agent Builder, and MCP clients.
+
+    The server provides:
+    - POST /v1/agent/hunt - Trigger Hunter Agent
+    - POST /v1/agent/verify - Trigger Investigator Agent
+    - POST /v1/agent/dispatch - Trigger Dispatch Agent
+    - GET /v1/leads/verified - Get verified leads
+
+    Swagger UI available at: http://localhost:8000/docs
+    OpenAPI Schema: http://localhost:8000/openapi.json
+
+    Examples:
+        alburaq serve
+        alburaq serve --port 3000
+        alburaq serve --reload (for development)
+
+    DEPLOYMENT:
+        For production deployment, consider:
+        - Railway.app (free tier, GitHub integration)
+        - Render.com (free tier, auto-detect FastAPI)
+        - Fly.io (flyctl launch)
+    """
+    import uvicorn
+
+    console.print(Panel.fit(
+        "[bold green]Al-Buraq API Server[/bold green]\n\n"
+        f"Starting server on http://{host}:{port}\n\n"
+        "[cyan]Endpoints:[/cyan]\n"
+        "  • Swagger UI: /docs\n"
+        "  • OpenAPI: /openapi.json\n"
+        "  • Hunt: POST /v1/agent/hunt\n"
+        "  • Verify: POST /v1/agent/verify\n"
+        "  • Dispatch: POST /v1/agent/dispatch\n"
+        "  • Leads: GET /v1/leads/verified\n\n"
+        "[dim]Press Ctrl+C to stop[/dim]",
+        title="Bismillah - Server Mode",
+    ))
+
+    try:
+        uvicorn.run(
+            "al_buraq.server:app",
+            host=host,
+            port=port,
+            reload=reload,
+            log_level="info",
+        )
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Server stopped by user[/yellow]")
+    except Exception as e:
+        console.print(f"[red]Server error: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def ui_dev(
+    port: int = typer.Option(3000, "--port", "-p", help="Port for Next.js dev server"),
+):
+    """
+    Start the Al-Buraq Chat UI development server.
+
+    Launches the Next.js frontend with OpenAI ChatKit (Assistant UI) on http://localhost:3000.
+    The Chat UI connects to the Python backend API at http://localhost:8000.
+
+    REQUIREMENTS:
+    1. Start the API server first: alburaq serve
+    2. Set OPENAI_API_KEY environment variable for AI responses
+
+    The UI provides:
+    - Conversational interface for Al-Buraq agents
+    - Real-time chat with Hunter, Investigator, and Dispatch agents
+    - Integration with @assistant-ui/react + Vercel AI SDK
+
+    Examples:
+        alburaq ui-dev
+        alburaq ui-dev --port 3001
+
+    SETUP (first time):
+        cd frontend
+        npm install
+    """
+    import subprocess
+    from pathlib import Path
+
+    console.print(Panel.fit(
+        "[bold green]Al-Buraq Chat UI[/bold green]\n\n"
+        f"Starting Next.js dev server on http://localhost:{port}\n\n"
+        "[cyan]Make sure the API server is running:[/cyan]\n"
+        "[dim]alburaq serve[/dim]\n\n"
+        "[cyan]Set your OpenAI API key:[/cyan]\n"
+        "[dim]export OPENAI_API_KEY=sk-...[/dim]",
+        title="Bismillah - CAARE Q3 Week 12",
+    ))
+
+    # Get the project root directory
+    project_root = Path(__file__).parent.parent.parent.parent
+    frontend_path = project_root / "frontend"
+
+    if not frontend_path.exists():
+        console.print(f"[red]Error: Frontend directory not found at {frontend_path}[/red]")
+        console.print("[yellow]Run this command from the project root directory.[/yellow]")
+        raise typer.Exit(1)
+
+    # Check if node_modules exists
+    node_modules = frontend_path / "node_modules"
+    if not node_modules.exists():
+        console.print("[yellow]node_modules not found. Running npm install first...[/yellow]")
+        try:
+            subprocess.run(
+                ["npm", "install"],
+                cwd=str(frontend_path),
+                check=True,
+            )
+            console.print("[green]Dependencies installed.[/green]\n")
+        except subprocess.CalledProcessError as e:
+            console.print(f"[red]npm install failed: {e}[/red]")
+            raise typer.Exit(1)
+
+    console.print(f"[cyan]Starting Next.js dev server...[/cyan]\n")
+
+    try:
+        # Run npm run dev in the frontend directory
+        subprocess.run(
+            ["npm", "run", "dev", "--", "-p", str(port)],
+            cwd=str(frontend_path),
+            check=True,
+        )
+    except KeyboardInterrupt:
+        console.print("\n[yellow]UI dev server stopped by user[/yellow]")
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]Dev server error: {e}[/red]")
+        raise typer.Exit(1)
+    except FileNotFoundError:
+        console.print("[red]Error: npm not found. Please install Node.js and npm.[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def verify_compliance():
+    """
+    Verify system compliance with MISSION.md constitution.
+
+    Runs the critical constitution tests to ensure the system
+    strictly follows all ethical rules defined in MISSION.md.
+
+    This includes:
+    - Halal compliance verification
+    - Commission calculation accuracy (7%)
+    - Charity allocation accuracy (5%)
+    """
+    import subprocess
+    from pathlib import Path
+
+    console.print(Panel.fit(
+        "[bold green]Constitution Compliance Verification[/bold green]\n"
+        "Running critical tests from MISSION.md...",
+        title="Bismillah",
+    ))
+
+    # Get the project root directory
+    project_root = Path(__file__).parent.parent.parent.parent
+    tests_path = project_root / "tests" / "test_constitution.py"
+
+    if not tests_path.exists():
+        console.print(f"[red]Error: Test file not found at {tests_path}[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[dim]Running tests: {tests_path}[/dim]\n")
+
+    # Run pytest on the constitution tests
+    try:
+        result = subprocess.run(
+            ["pytest", str(tests_path), "-v", "--tb=short", "--color=yes"],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True,
+        )
+
+        # Print output
+        print(result.stdout)
+        if result.stderr:
+            print(result.stderr)
+
+        # Check if all tests passed
+        if result.returncode == 0:
+            console.print(Panel.fit(
+                "[bold green]COMPLIANCE VERIFIED[/bold green]\n\n"
+                "✓ All constitution tests passed\n"
+                "✓ System is operating in full compliance with MISSION.md\n"
+                "✓ Halal filter working correctly\n"
+                "✓ Commission math accurate (7%)\n"
+                "✓ Charity allocation accurate (5%)\n\n"
+                "[dim]Al-Buraq ethical framework integrity confirmed.[/dim]",
+                title="Alhamdulillah - Success",
+            ))
+        else:
+            console.print(Panel.fit(
+                "[bold red]COMPLIANCE FAILURE[/bold red]\n\n"
+                "✗ One or more constitution tests failed\n"
+                "✗ System may be violating MISSION.md rules\n\n"
+                "[yellow]ACTION REQUIRED:[/yellow]\n"
+                "1. Review the test failures above\n"
+                "2. Check MISSION.md for rule violations\n"
+                "3. Fix the compliance issues immediately\n"
+                "4. Re-run: alburaq verify-compliance\n\n"
+                "[dim]Never compromise on ethical principles.[/dim]",
+                title="Critical Alert",
+            ))
+            raise typer.Exit(1)
+
+    except FileNotFoundError:
+        console.print("[red]Error: pytest not found. Run: pip install pytest[/red]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]Error running tests: {e}[/red]")
+        raise typer.Exit(1)
+
+
 # =============================================================================
 # Demo Command
 # =============================================================================
@@ -1261,6 +1549,287 @@ def preview_csv(
                 sample_table.add_row(*values)
 
             console.print(sample_table)
+
+
+# =============================================================================
+# Community Analysis Commands
+# =============================================================================
+
+@app.command()
+def scan_community(
+    limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Maximum leads to scan"),
+    verified_only: bool = typer.Option(True, "--verified/--all", help="Only scan verified leads"),
+    min_confidence: float = typer.Option(0.3, "--min-confidence", help="Minimum confidence threshold"),
+    export_csv: bool = typer.Option(False, "--export", "-e", help="Export results to CSV"),
+):
+    """
+    Scan leads for cultural affinity markers.
+
+    Identifies potential Muslim-owned businesses based on name patterns,
+    Islamic business markers, and cultural indicators.
+
+    Examples:
+        alburaq scan-community
+        alburaq scan-community --all --min-confidence 0.5
+        alburaq scan-community --export
+    """
+    from ..analysis import IdentityScanner
+    import csv
+    from pathlib import Path
+
+    repo = get_repository()
+
+    console.print(Panel.fit(
+        "[bold green]Cultural Intelligence Scanner[/bold green]\n"
+        "Identifying community-aligned businesses...",
+        title="Bismillah",
+    ))
+
+    # Get leads to scan
+    if verified_only:
+        leads_list = repo.get_verified_leads(limit=limit or 10000)
+        scan_type = "Verified Leads"
+    else:
+        leads_list = repo.list_leads(is_qualified=True, limit=limit or 10000)
+        scan_type = "All Qualified Leads"
+
+    if not leads_list:
+        console.print("[yellow]No leads found to scan.[/yellow]")
+        return
+
+    console.print(f"[dim]Scanning {len(leads_list)} {scan_type}...[/dim]\n")
+
+    # Run scanner
+    scanner = IdentityScanner()
+    matches = scanner.scan_leads(leads_list)
+
+    # Filter by confidence
+    matches = [m for m in matches if m.confidence_score >= min_confidence]
+
+    if not matches:
+        console.print(f"[yellow]No matches found with confidence >= {min_confidence}[/yellow]")
+        return
+
+    # Show statistics
+    stats = scanner.get_stats(matches)
+
+    stats_table = Table(title="Scan Results")
+    stats_table.add_column("Metric", style="cyan")
+    stats_table.add_column("Value", style="green")
+
+    stats_table.add_row("Total Scanned", str(len(leads_list)))
+    stats_table.add_row("Matches Found", f"[bold green]{stats['total_matches']}[/bold green]")
+    stats_table.add_row("High Confidence (70%+)", str(stats['high_confidence']))
+    stats_table.add_row("Medium Confidence (40-70%)", str(stats['medium_confidence']))
+    stats_table.add_row("Low Confidence (<40%)", str(stats['low_confidence']))
+    stats_table.add_row("Average Confidence", f"{stats['avg_confidence']:.1%}")
+    stats_table.add_row("Social Verified", str(stats['social_verified_count']))
+
+    console.print(stats_table)
+
+    # Show matches
+    console.print(f"\n[cyan]Community-Aligned Businesses ({len(matches)} found):[/cyan]\n")
+
+    results_table = Table(title="Likely Muslim-Owned Businesses")
+    results_table.add_column("Company", width=25)
+    results_table.add_column("Owner", width=15)
+    results_table.add_column("State", width=5)
+    results_table.add_column("Confidence", width=10)
+    results_table.add_column("Social", width=8)
+    results_table.add_column("Indicators", width=30)
+
+    for match in matches[:50]:  # Show top 50
+        conf_color = "green" if match.confidence_score >= 0.7 else "yellow" if match.confidence_score >= 0.4 else "white"
+        social_status = "[green]Yes[/green]" if match.social_verified else "[dim]No[/dim]"
+
+        # Show first 2 match reasons
+        indicators = ", ".join(match.matched_patterns[:3])
+
+        results_table.add_row(
+            match.company_name[:25],
+            (match.owner_name or "")[:15],
+            match.state or "?",
+            f"[{conf_color}]{match.confidence_score:.0%}[/{conf_color}]",
+            social_status,
+            indicators[:30],
+        )
+
+    console.print(results_table)
+
+    # Export if requested
+    if export_csv:
+        output_path = Path("community_aligned_leads.csv")
+
+        fieldnames = [
+            "company_name",
+            "owner_name",
+            "email",
+            "phone",
+            "state",
+            "confidence_score",
+            "lead_score",
+            "social_verified",
+            "match_reasons",
+            "matched_patterns",
+        ]
+
+        with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+
+            for match in matches:
+                writer.writerow({
+                    "company_name": match.company_name,
+                    "owner_name": match.owner_name or "",
+                    "email": match.email or "",
+                    "phone": match.phone or "",
+                    "state": match.state or "",
+                    "confidence_score": f"{match.confidence_score:.2f}",
+                    "lead_score": f"{match.lead_score:.2f}",
+                    "social_verified": "Yes" if match.social_verified else "No",
+                    "match_reasons": " | ".join(match.match_reasons),
+                    "matched_patterns": ", ".join(match.matched_patterns),
+                })
+
+        console.print(f"\n[green]Exported to: {output_path.absolute()}[/green]")
+
+    # Summary
+    console.print(Panel.fit(
+        f"[bold green]Scan Complete[/bold green]\n\n"
+        f"Found {len(matches)} potential community-aligned businesses\n"
+        f"Average Confidence: {stats['avg_confidence']:.0%}\n"
+        f"Social Verified: {stats['social_verified_count']}\n\n"
+        f"[dim]This is cultural affinity detection for targeted outreach.[/dim]",
+        title="Alhamdulillah",
+    ))
+
+
+# =============================================================================
+# Export Commands
+# =============================================================================
+
+@app.command()
+def export(
+    output: str = typer.Option("export.csv", "--output", "-o", help="Output file path"),
+    verified: bool = typer.Option(False, "--verified", "-v", help="Export only verified leads"),
+    social: bool = typer.Option(False, "--social", "-s", help="Export only socially verified"),
+    high_intent: bool = typer.Option(False, "--intent", "-i", help="Export only high intent"),
+    limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Maximum leads to export"),
+):
+    """
+    Export leads to CSV file.
+
+    Exports leads with all contact information for outreach campaigns.
+
+    Examples:
+        alburaq export --verified -o verified_leads.csv
+        alburaq export --social --intent -o hot_leads.csv
+        alburaq export --limit 100 -o sample.csv
+    """
+    import csv
+    from pathlib import Path
+
+    repo = get_repository()
+
+    # Get leads based on filters
+    if verified or social or high_intent:
+        leads_list = repo.get_verified_leads(
+            social_verified=True if social else None,
+            high_intent=True if high_intent else None,
+            limit=limit or 10000,
+        )
+    else:
+        leads_list = repo.list_leads(
+            is_qualified=True,
+            limit=limit or 10000,
+        )
+
+    if not leads_list:
+        console.print("[yellow]No leads found matching criteria.[/yellow]")
+        return
+
+    # Define CSV columns
+    fieldnames = [
+        "company_name",
+        "mc_number",
+        "dot_number",
+        "owner_name",
+        "email",
+        "phone",
+        "state",
+        "city",
+        "truck_count",
+        "equipment_types",
+        "lead_score",
+        "social_verified",
+        "high_intent",
+        "linkedin_url",
+        "facebook_url",
+        "website_url",
+        "verification_status",
+        "created_at",
+    ]
+
+    output_path = Path(output)
+
+    with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for lead in leads_list:
+            equipment = ", ".join(
+                e.value if hasattr(e, 'value') else str(e)
+                for e in lead.fleet.equipment_types
+            )
+
+            writer.writerow({
+                "company_name": lead.company_name,
+                "mc_number": lead.authority.mc_number,
+                "dot_number": lead.authority.dot_number or "",
+                "owner_name": lead.owner_name or "",
+                "email": lead.contact.email or "",
+                "phone": lead.contact.phone_primary or "",
+                "state": lead.fleet.home_base_state or "",
+                "city": lead.fleet.home_base_city or "",
+                "truck_count": lead.fleet.truck_count,
+                "equipment_types": equipment,
+                "lead_score": f"{lead.lead_score:.2f}",
+                "social_verified": "Yes" if lead.social_verified else "No",
+                "high_intent": "Yes" if lead.high_intent else "No",
+                "linkedin_url": lead.linkedin_url or "",
+                "facebook_url": lead.facebook_url or "",
+                "website_url": lead.website_url or "",
+                "verification_status": lead.verification_status,
+                "created_at": lead.created_at.strftime("%Y-%m-%d") if lead.created_at else "",
+            })
+
+    console.print(Panel.fit(
+        f"[bold green]Export Complete[/bold green]\n\n"
+        f"File: {output_path.absolute()}\n"
+        f"Leads Exported: {len(leads_list)}\n"
+        f"Filters: {'Verified' if verified else 'All'}"
+        f"{' + Social' if social else ''}"
+        f"{' + High Intent' if high_intent else ''}",
+        title="Success",
+    ))
+
+    # Show sample
+    console.print("\n[cyan]Sample of exported data:[/cyan]")
+    table = Table()
+    table.add_column("Company", width=25)
+    table.add_column("Email", width=30)
+    table.add_column("State", width=5)
+    table.add_column("Score", width=6)
+
+    for lead in leads_list[:5]:
+        table.add_row(
+            lead.company_name[:25],
+            (lead.contact.email or "")[:30],
+            lead.fleet.home_base_state or "?",
+            f"{lead.lead_score:.2f}",
+        )
+
+    console.print(table)
 
 
 # =============================================================================

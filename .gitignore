@@ -70,3 +70,9 @@ Thumbs.db
 *_key*
 credentials.json
 secrets.json
+
+# Large data files (CSV imports)
+*.csv
+fmcsa_data.csv
+community_aligned_leads.csv
+verified_leads.csv
